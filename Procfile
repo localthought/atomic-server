@@ -1,1 +1,1 @@
-web: target/release/atomic-server
+web: ATOMIC_PORT=$PORT target/release/atomic-server
