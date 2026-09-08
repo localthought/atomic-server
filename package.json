@@ -1,4 +1,7 @@
 {
   "private": true,
-  "packageManager": "pnpm@10.15.1"
+  "packageManager": "pnpm@10.15.1",
+  "scripts": {
+    "heroku-postbuild": "npm install -g pnpm@10.15.1"
+  }
 }
