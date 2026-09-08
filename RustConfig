@@ -1,0 +1,8 @@
+# Heroku's Rust buildpack (emk/heroku-buildpack-rust) reads this file.
+#
+# Without this, a bare `cargo build --release` builds every workspace member,
+# including `desktop` (the Tauri app) and `wasm` — neither runs on a Heroku
+# web dyno, and `desktop` pulls in webkit2gtk/libsoup3/GTK, which is why the
+# Heroku build needed an ever-growing Aptfile just to link a binary nothing
+# deploys. Restrict the build to the one binary Heroku actually runs.
+RUST_CARGO_BUILD_FLAGS="--release -p atomic-server --bin atomic-server"
