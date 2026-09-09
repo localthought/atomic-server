@@ -11,3 +11,4 @@ RUST_CARGO_BUILD_FLAGS="--release -p atomic-server --bin atomic-server"
 export ATOMICSERVER_REQUIRE_PLUGIN_RUNTIME=true
 # The Apt buildpack extracts LLVM outside the system library search path.
 export LIBCLANG_PATH="$BUILD_DIR/.apt/usr/lib/llvm-18/lib"
+export BINDGEN_EXTRA_CLANG_ARGS="-resource-dir=$BUILD_DIR/.apt/usr/lib/llvm-18/lib/clang/18"
