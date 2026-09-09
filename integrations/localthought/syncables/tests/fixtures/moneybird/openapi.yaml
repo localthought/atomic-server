@@ -1,0 +1,121 @@
+openapi: 3.0.3
+info:
+  title: Moneybird Contacts API
+  description: Read-only contacts integration for the Moneybird API. The administration ID is supplied in every resource path.
+  version: v2-readonly-20260909
+  contact:
+    name: Moneybird
+    email: support@moneybird.com
+    url: https://developer.moneybird.com
+  x-apisguru-categories:
+    - financial
+  x-origin:
+    - format: openapi
+      url: https://raw.githubusercontent.com/moneybird/openapi/main/openapi.yml
+      version: "3.1"
+  x-providerName: moneybird.com
+servers:
+  - url: https://moneybird.com/api/v2
+security:
+  - bearerAuth: []
+paths:
+  /administrations.json:
+    get:
+      operationId: get_administrations
+      summary: List administrations
+      responses:
+        '200':
+          description: Administrations available to the authenticated user
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/administration' }
+  /{administration_id}/contacts.json:
+    get:
+      operationId: get_administration_contacts
+      summary: List contacts
+      parameters:
+        - $ref: '#/components/parameters/administration_id'
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        '200':
+          description: A paginated list of contacts
+          headers:
+            Link:
+              description: RFC 8288 pagination links
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/contact' }
+  /{administration_id}/contacts/{id}.json:
+    get:
+      operationId: get_administration_contact
+      summary: Get a contact
+      parameters:
+        - $ref: '#/components/parameters/administration_id'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, pattern: '^[0-9]+$' }
+      responses:
+        '200':
+          description: A contact
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/contact' }
+        '404': { description: Contact not found }
+components:
+  parameters:
+    administration_id:
+      in: path
+      name: administration_id
+      required: true
+      description: The unique numeric identifier of the Moneybird administration.
+      schema: { type: string, pattern: '^[0-9]+$' }
+  schemas:
+    administration:
+      type: object
+      properties:
+        id: { type: string, pattern: '^[0-9]+$' }
+        name: { type: string }
+        language: { type: string }
+        currency: { type: string }
+      required: [id]
+    contact:
+      type: object
+      description: A contact in a Moneybird administration.
+      properties:
+        id: { type: string, pattern: '^[0-9]+$' }
+        administration_id: { type: string, pattern: '^[0-9]+$' }
+        company_name: { type: string }
+        firstname: { type: string }
+        lastname: { type: string }
+        email: { type: string, format: email }
+        updated_at: { type: string, format: date-time }
+      required: [id]
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    moneybirdOAuth:
+      type: oauth2
+      description: OAuth 2.0 authorization for Moneybird administrations. Contacts require sales_invoices, documents, estimates, bank, or settings scope.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://moneybird.com/oauth/authorize
+          tokenUrl: https://moneybird.com/oauth/token
+          scopes:
+            sales_invoices: Access contacts through sales invoices permission
+            documents: Access contacts through documents permission
+            estimates: Access contacts through estimates permission
+            bank: Access contacts through bank permission
+            time_entries: Access time entries
+            settings: Access contacts through settings permission

@@ -1,0 +1,29 @@
+overlay: 1.0.0
+info:
+  title: Moneybird API CRUD Causality
+  version: 1.0.0
+# Contacts are independently addressable by their string IDs. The
+# administration_id is supplied by configuration and is shared by every URL.
+actions:
+  - target: $.components
+    update:
+      crudResources:
+        contact:
+          schema:
+            $ref: '#/components/schemas/contact'
+          description: A contact in a Moneybird administration.
+          identity:
+            urlTemplate: /{administration_id}/contacts/{id}.json
+            bindings:
+              id:
+                field: id
+          collections:
+            contacts:
+              urlTemplate: /{administration_id}/contacts.json
+
+  - target: $.paths['/{administration_id}/contacts.json'].get
+    update:
+      x-crud: { action: list, resource: contact, collection: contacts }
+  - target: $.paths['/{administration_id}/contacts/{id}.json'].get
+    update:
+      x-crud: { action: read, resource: contact }

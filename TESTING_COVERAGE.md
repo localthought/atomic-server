@@ -1,5 +1,12 @@
 # Testing coverage map
 
+Moneybird contact import: `integrations/localthought/syncables/tests/moneybird_two_page.rs`
+loads the pinned read-only OAD and overlays from local fixtures, verifies that
+only contacts are managed with an administration ID parameter, preserves typed
+contact fields, follows a two-page RFC 8288 Link response, and issues only GETs.
+Run `cargo test --manifest-path integrations/localthought/syncables/Cargo.toml --test moneybird_two_page`.
+This synthetic test does not verify live OAuth credentials or account access.
+
 LocalThought browser migration: `integrations/localthought/browser.test.ts`
 covers tenant HMAC, actor/drive ownership, rotation before dispatch, pagination,
 uncertain-response refusal and cross-origin pagination refusal. The real generated

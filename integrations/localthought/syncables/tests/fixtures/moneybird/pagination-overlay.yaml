@@ -1,0 +1,27 @@
+overlay: 1.0.0
+info:
+  title: Moneybird API Pagination Schemes
+  version: 1.0.0
+# Moneybird uses RFC 8288 Link headers. The next URL already contains the
+# incremented page; per_page is retained as the page-size control.
+actions:
+  - target: $.components
+    update:
+      paginationSchemes:
+        nextLink:
+          type: nextLink
+          request:
+            queryParameters:
+              per_page:
+                role: pageSize
+                description: Results per page (maximum 100).
+          response:
+            headers:
+              Link:
+                role: nextLink
+                description: RFC 8288 Link header; follow the rel="next" URL.
+
+  - target: $.paths['/{administration_id}/contacts.json'].get
+    update:
+      x-pagination:
+        - scheme: nextLink
