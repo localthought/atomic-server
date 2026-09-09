@@ -68,7 +68,7 @@ export const PluginPage: React.FC<ResourcePageProps<Server.Plugin>> = ({
               <UpdatePluginButton plugin={resource} />
               <Button alert onClick={() => setShowUninstallDialog(true)}>
                 <FaTrash />
-                Uninstall
+                <span>Uninstall</span>
               </Button>
             </Row>
           )}
@@ -81,12 +81,15 @@ export const PluginPage: React.FC<ResourcePageProps<Server.Plugin>> = ({
         {canWrite && (
           <AssignRights plugin={resource} disabled={hasFullDriveAccess} />
         )}
+        {/* Secrets are declared by name in a plugin's source; a WASM plugin's
+            manifest carries origins but no names, so it has nothing to render
+            slots from yet. The endpoint still serves it. */}
         <Column>
           <Row center justify='space-between'>
             <h3 id={configLabelId}>
               <Row gap='0.5ch' center>
                 <FaGear />
-                Config
+                <span>Config</span>
               </Row>
             </h3>
             <Button
@@ -94,7 +97,7 @@ export const PluginPage: React.FC<ResourcePageProps<Server.Plugin>> = ({
               onClick={() => resource.save()}
             >
               <FaFloppyDisk />
-              Save
+              <span>Save</span>
             </Button>
           </Row>
           <JSONEditor

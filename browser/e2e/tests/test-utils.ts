@@ -281,12 +281,44 @@ export async function installCommitWatcher(page: Page) {
     const SUBJECT = 'https://atomicdata.dev/properties/subject';
     const COMMIT_CLASS = 'https://atomicdata.dev/classes/Commit';
 
+    type ObservedCommit = {
+      sentAt: number;
+      subject: string;
+      commit: Record<string, unknown>;
+    };
+    const pending = new WeakMap<WebSocket, Map<number, ObservedCommit>>();
     const origSend = WebSocket.prototype.send;
 
     WebSocket.prototype.send = function (
       data: string | ArrayBufferLike | Blob | ArrayBufferView,
     ) {
       try {
+        if (!pending.has(this)) {
+          const requests = new Map<number, ObservedCommit>();
+          pending.set(this, requests);
+          this.addEventListener('message', async event => {
+            const bytes =
+              event.data instanceof Blob
+                ? new Uint8Array(await event.data.arrayBuffer())
+                : event.data instanceof ArrayBuffer
+                  ? new Uint8Array(event.data)
+                  : undefined;
+            if (!bytes || bytes.length < 3 || bytes[0] !== 0x14) return;
+            const id = new DataView(bytes.buffer, bytes.byteOffset).getUint16(
+              1,
+              false,
+            );
+            const entry = requests.get(id);
+
+            if (entry) {
+              (
+                window as unknown as { __atomicCommitLog: ObservedCommit[] }
+              ).__atomicCommitLog.push(entry);
+              requests.delete(id);
+            }
+          });
+        }
+
         if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
           const buf =
             data instanceof ArrayBuffer
@@ -303,20 +335,16 @@ export async function installCommitWatcher(page: Page) {
             const isA = commit[ISA] as string[] | undefined;
 
             if (Array.isArray(isA) && isA.includes(COMMIT_CLASS)) {
-              const log = (
-                window as unknown as {
-                  __atomicCommitLog: Array<{
-                    sentAt: number;
-                    subject: string;
-                    commit: Record<string, unknown>;
-                  }>;
-                }
-              ).__atomicCommitLog;
-              log.push({
-                sentAt: Date.now(),
-                subject: (commit[SUBJECT] as string | undefined) ?? '',
-                commit,
-              });
+              pending
+                .get(this)!
+                .set(
+                  new DataView(buf.buffer, buf.byteOffset).getUint16(1, false),
+                  {
+                    sentAt: Date.now(),
+                    subject: (commit[SUBJECT] as string | undefined) ?? '',
+                    commit,
+                  },
+                );
             }
           }
         }
@@ -389,7 +417,7 @@ export async function setTitle(page: Page, title: string) {
   await commitPosted;
 }
 
-/** Wait for either an HTTP `/commit` POST or a WS COMMIT frame whose
+/** Wait for either an HTTP `/commit` POST or an acknowledged WS COMMIT frame whose
  *  body references `subject` and was sent at or after `since`. */
 function waitForCommitForSubject(page: Page, subject: string, since: number) {
   const http = page.waitForResponse(
@@ -1046,6 +1074,7 @@ export async function newResource(klass: string, page: Page) {
   };
 
   if (klass.startsWith('https://')) {
+    await page.getByText('Choose a class by URL', { exact: true }).click();
     await fillSearchBox(page, 'Search for a class or enter a URL', klass);
     await page.keyboard.press('Enter');
     await waitForResourceForm();
@@ -1057,7 +1086,18 @@ export async function newResource(klass: string, page: Page) {
     // click times out. Gate on the button's visibility explicitly — its
     // appearance IS the "class is searchable" readiness signal — with a budget
     // that tolerates a slow index flush instead of a blind pre-sleep.
-    const classButton = page.locator(`button:has-text("${klass}")`);
+    const label =
+      (
+        {
+          'document-v2': 'Document',
+          chatroom: 'Chat room',
+          'ai-chat': 'AI chat',
+        } as Record<string, string>
+      )[klass] ?? klass;
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const classButton = page.getByRole('button', {
+      name: new RegExp(`^${escaped}$`, 'i'),
+    });
     await classButton.waitFor({ state: 'visible', timeout: 30000 });
     await classButton.click();
     // Wait for any of: URL leaves /app/new (basic-instance handlers), a
@@ -1128,14 +1168,20 @@ export async function createTableFromDialog(
   await newResource('table', page);
 
   if (template) {
-    await page.getByRole('button', { name: template }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: template })
+      .click();
   }
 
   if (name !== undefined) {
     await page.getByPlaceholder('New Table').fill(name);
   }
 
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Create', exact: true })
+    .click();
   await waitForTableBuild(page);
 }
 

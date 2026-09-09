@@ -14,7 +14,7 @@ import type { Agent } from './agent.js';
 import { Client } from './client.js';
 import type { Collection } from './collection.js';
 import { CollectionBuilder } from './collectionBuilder.js';
-import { CommitBuilder, Commit } from './commit.js';
+import { CommitBuilder, isCommitSubject, Commit } from './commit.js';
 import { perfSpan } from './perf-trace.js';
 import { validateDatatype, datatypeTag, Datatype } from './datatypes.js';
 import { isUnauthorized } from './error.js';
@@ -38,7 +38,6 @@ import {
   type MergeForkOptions,
 } from './forks.js';
 import { GENESIS, properties, instances } from './urls.js';
-import { isCommitSubject } from './local-outbox.js';
 import {
   valToArray,
   type JSONValue,
@@ -549,7 +548,11 @@ export class Resource<C extends OptionalClass = any> {
           this._loading = false;
         }
 
-        this.eventManager.emit(ResourceEvents.LoadingChange, this.loading);
+        // Lazy reads also run inside React render. Publish the completed
+        // hydration after the reader returns, never from inside that render.
+        queueMicrotask(() => {
+          this.eventManager.emit(ResourceEvents.LoadingChange, this.loading);
+        });
       }
 
       // Sign-at-drain: a local Loro op marks the subject dirty in the
@@ -559,9 +562,10 @@ export class Resource<C extends OptionalClass = any> {
       // calls get through.
       //
       // Skip subjects we don't own:
-      // - `did:ad:commit:*` are commit-detail resources materialized
-      //   locally for the Sync page; the server creates them on apply
-      //   and there's nothing to POST.
+      // - Commit subjects (`did:ad:commit:*`, or the `<server>/commits/*`
+      //   URLs imported resources still carry) are commit-detail resources
+      //   materialized locally for the Sync page; the server creates them on
+      //   apply and there's nothing to POST.
       // - External HTTP subjects (atomicdata.dev/* etc.) belong to
       //   another domain. POSTing them returns "Subject of commit
       //   should be sent to other domain."
@@ -1115,6 +1119,9 @@ export class Resource<C extends OptionalClass = any> {
     isFirstCommit: boolean,
     commitMessage?: string,
   ): { bytes: Uint8Array; versionAfterExport: VersionVector } | undefined {
+    // Incremental saves bypass signChanges; they still need datatype tags for
+    // newly added JSON/reference fields before capturing the signed delta.
+    this.writeDatatypeTags();
     const bytes = this.exportLoroDeltaInternal(isFirstCommit, commitMessage);
     if (!bytes) return undefined;
     if (!this._loroDoc) return undefined;
@@ -3224,15 +3231,6 @@ export class Resource<C extends OptionalClass = any> {
       return this.saveLocalOnly(agent, hasChanges);
     }
 
-    // True when this save creates the resource for the first time (a genesis
-    // commit). Newly-created online resources are not otherwise written to the
-    // local clientDb — `addResource` skips OPFS puts for `_new:`/unsynced
-    // resources, and the `_new:`→`did:ad:` rename doesn't re-persist. Without a
-    // clientDb write the resource is on the server but absent from OPFS, so the
-    // OPFS-first collection queries (`parent=…`) miss it after a reload until a
-    // full drive re-sync happens to pull it back. We persist it below.
-    let wasGenesis = false;
-
     try {
       // A genesis signed at creation time by `store.newResource` is held
       // on the resource (`_pendingGenesis`) — NOT the outbox — so an
@@ -3240,15 +3238,16 @@ export class Resource<C extends OptionalClass = any> {
       // filled) is never POSTed. Now that the user is explicitly
       // saving, move it into the outbox to drain.
       if (this._pendingGenesis) {
-        wasGenesis = true;
         this.store.outbox.setGenesisCommit(this.subject, this._pendingGenesis);
         this._pendingGenesis = undefined;
       } else if (
         hasChanges &&
-        (this.#commitBuilder.isGenesis || this.subject.startsWith('_new:'))
+        (this.#commitBuilder.isGenesis ||
+          this.subject.startsWith('_new:') ||
+          (this.new &&
+            this.subject.startsWith('did:ad:') &&
+            !this.subject.startsWith('did:ad:agent:')))
       ) {
-        wasGenesis = true;
-
         // Genesis path for resources NOT created via `store.newResource` —
         // the new-resource form / `NewInstanceButton`, which mint a
         // transient `_new:` subject via `store.createSubject()` and then
@@ -3305,34 +3304,10 @@ export class Resource<C extends OptionalClass = any> {
       // that need "is it safe to leave?" before proceeding.
       await this.store.syncDirtyResources();
 
-      // Mirror just-created resources into clientDb so the OPFS-first cold
-      // path (collection `parent=` queries after a reload) sees them locally
-      // instead of returning a stale empty result. Covers two cases:
-      //  - Agents: the server returns a synthetic just-in-time view (no
-      //    `drives`/`privateDrive`) until the commit durably persists, so a
-      //    refetch under load loses the user's saved drives.
-      //  - Any genesis (e.g. table rows materialized from a virtual `_new:`
-      //    placeholder): the resource is on the server but was never put in
-      //    OPFS, so its parent-indexed membership is invisible after reload.
-      //
-      // This write is on the critical path of every create, and against a
-      // RELEASE server it is the dominant one: ~33 ms here versus ~5 ms for the
-      // commit round-trip it follows. Measure against a debug server and you
-      // conclude the opposite — that build verifies signatures ~7× slower,
-      // which buries this. Worker-side split of the ~33 ms, on sub-2KB
-      // payloads: ~13 ms `putResource` (parse + a redb write transaction per
-      // resource), ~2.5 ms snapshot, ~3.5 ms fsync, the rest postMessage and
-      // queue wait. The Loro export before it is 0 ms.
-      //
-      // It stays awaited AND durable regardless. Callers read the local
-      // database back straight away (a table's rows come from a `parent=`
-      // query); dropping either loses freshly-typed rows in `tables.spec.ts`,
-      // measured on a healthy store. Making a burst of creates faster means
-      // making fewer, larger writes — one transaction over N resources — not
-      // making each one lazier.
-      if (wasGenesis || this.subject.startsWith('did:ad:agent:')) {
-        await this.persistToClientDb();
-      }
+      // The server acknowledgement does not make the OPFS cache durable.
+      // Explicit saves must survive an immediate reload for existing resources
+      // too (for example a dashboard block renamed in its config dialog).
+      await this.persistToClientDb();
 
       return 'persisted';
     } catch (e) {
@@ -3474,8 +3449,17 @@ export class Resource<C extends OptionalClass = any> {
    * @internal store-level / offline-persistence only.
    */
   public async persistToClientDb(): Promise<void> {
+    // The identity database can be between workers while its key is derived.
+    // A save must not resolve in that gap without writing its snapshot.
+    const identity = this.store.getAgent()?.subject;
+    await this.store.waitForClientDb(10_000);
+
+    if (this.store.getAgent()?.subject !== identity) {
+      throw new Error('Identity changed before local persistence');
+    }
+
     const clientDb = this.store.getClientDb();
-    if (!clientDb) return;
+    if (!clientDb || clientDb.unsupportedEnvironment) return;
 
     const obj: Record<string, unknown> = { '@id': this.subject };
 
@@ -3498,10 +3482,14 @@ export class Resource<C extends OptionalClass = any> {
         JSON.stringify(obj),
         snapshot,
       );
+      // Worker writes are batched without fsync; put completion alone is not
+      // the durability barrier promised by save().
+      await clientDb.flush();
       closePersist();
     } catch (e) {
       closePersist({ err: e instanceof Error ? e.message : String(e) });
       console.error('[persistToClientDb] failed:', e);
+      throw e;
     }
   }
 

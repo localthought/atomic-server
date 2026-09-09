@@ -1,3 +1,4 @@
+import { RequestCancelledError } from './error.js';
 /**
  * Single durable queue for "writes that haven't reached the server".
  *
@@ -176,6 +177,18 @@ export function isTerminalCommitErrorMessage(message: string): boolean {
   // is correct: no retry can ever satisfy the constraint. The server emits
   // "Property <p> missing. Is required in class <c> " (resources.rs).
   if (message.includes('missing. Is required in class')) {
+    return true;
+  }
+
+  // A Commit was queued as if it were an editable resource. Commits are
+  // immutable by definition, so the server refuses the write on every attempt
+  // (`hierarchy.rs`: "Commits cannot be edited.") and the entry retries on
+  // backoff forever. Nothing is lost by dropping it: a Commit's content is
+  // whatever was signed, and no local edit to it could ever have applied.
+  // Seen in the field on resources imported from another server, whose
+  // `<server>/commits/<sig>` subjects slip past the `did:ad:commit:` guard
+  // that keeps client-minted commits out of the outbox.
+  if (message.includes('Commits cannot be edited')) {
     return true;
   }
 
@@ -645,6 +658,9 @@ export class LocalOutbox {
         const stillLive = this.entries.get(entry.subject);
         if (stillLive) stillLive.failures = 0;
       } catch (e) {
+        // Explicit disconnect cancels the attempt, not the durable write.
+        // Keep it queued for reconnect without escalating retry failures.
+        if (e instanceof RequestCancelledError) return;
         live.lastAttemptError = e instanceof Error ? e.message : String(e);
         console.warn(
           '[Outbox] drain failed for subject:',

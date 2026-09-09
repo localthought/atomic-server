@@ -1,3 +1,4 @@
+import { IntegrationActionReview } from './IntegrationActionReview';
 import { getToolName, type DynamicToolUIPart, type ToolUIPart } from 'ai';
 import { styled } from 'styled-components';
 import {
@@ -40,6 +41,33 @@ export const MessageToolPart: React.FC<ToolMessageProps> = ({ part }) => {
         </PartSummary>
       </Shimmer>
     );
+  }
+
+  if (
+    part.state === 'output-available' &&
+    toolName === TOOL_NAMES.CALL_INTEGRATION_ACTION
+  ) {
+    const output = part.output as {
+      status?: string;
+      drive?: string;
+      integration?: string;
+      proposal?: { id?: string };
+    } | null;
+
+    if (
+      output?.status === 'needs_review' &&
+      typeof output.drive === 'string' &&
+      typeof output.integration === 'string' &&
+      typeof output.proposal?.id === 'string'
+    ) {
+      return (
+        <IntegrationActionReview
+          drive={output.drive}
+          plugin={output.integration}
+          id={output.proposal.id}
+        />
+      );
+    }
   }
 
   if (part.state === 'output-available') {
@@ -207,7 +235,7 @@ const ToolTitle = ({
 const FetchResourceTitle = ({ subjects }: { subjects: string[] }) => {
   return (
     <span>
-      Reading{' '}
+      <span>Reading</span>{' '}
       <InlineFormattedResourceList
         subjects={subjects}
         RenderComp={ResourceTitle}
@@ -262,14 +290,14 @@ const CreateResourceTitle = ({ jsonAD }: { jsonAD: string }) => {
   if (count !== undefined) {
     return (
       <span>
-        Creating <Name>{count} resources</Name>
+        <span>Creating</span> <Name>{count} resources</Name>
       </span>
     );
   }
 
   return (
     <span>
-      Creating <Name>{name}</Name>
+      <span>Creating</span> <Name>{name}</Name>
     </span>
   );
 };
@@ -285,7 +313,8 @@ const EditTitle = ({
 
   return (
     <span>
-      Editing {propertyResource.title} on <ResourceTitle subject={subject} />
+      <span>Editing {propertyResource.title} on</span>{' '}
+      <ResourceTitle subject={subject} />
     </span>
   );
 };
@@ -293,7 +322,7 @@ const EditTitle = ({
 const EditDocumentTitle = ({ subject }: { subject: string }) => {
   return (
     <span>
-      Editing <ResourceTitle subject={subject} />
+      <span>Editing</span> <ResourceTitle subject={subject} />
     </span>
   );
 };

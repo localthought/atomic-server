@@ -1,3 +1,7 @@
+// Ambient subpath types must be included without adding a runtime import.
+// oxlint-disable-next-line typescript/triple-slash-reference
+/// <reference path="./loro-web.d.ts" />
+import { pageRequestSignal } from './page-request-signal.js';
 import type * as Loro from 'loro-crdt';
 
 /**
@@ -50,6 +54,7 @@ export class LoroLoader {
   }
 
   private static async doInitialize(): Promise<void> {
+    const signal = pageRequestSignal();
     // In a browser, import loro-crdt's `web` build and run its
     // wasm-bindgen init. The default `loro-crdt` entry resolves (via
     // its `module` field) to the `bundler` build, whose WASM↔JS
@@ -65,14 +70,7 @@ export class LoroLoader {
 
     try {
       const mod = isBrowser
-        ? // `loro-crdt`'s package.json has no `exports` map for the `web`
-          // subpath (only top-level `main`/`module`/`types`), so
-          // `moduleResolution: NodeNext` can't find its type declarations
-          // even though `web/index.d.ts` genuinely ships in the package
-          // and this resolves fine at runtime (bundler + Node). Reproduces
-          // with a bare `tsc --noEmit` too — not typedoc-specific.
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-expect-error TS2307 — see comment above; import path itself is correct.
+        ? // The browser entry includes its own type declarations.
           ((await import('loro-crdt/web')) as unknown as typeof Loro & {
             default?: unknown;
           })
@@ -90,6 +88,10 @@ export class LoroLoader {
 
       this._Loro = mod;
     } catch (e) {
+      // Navigation can discard the WASM response while compilation is pending.
+      // The departing document no longer needs an editor; active-page failures
+      // still reject and are reported below.
+      if (signal?.aborted) return;
       console.error(
         '[LoroLoader] initializeLoro: loro-crdt import/init failed:',
         e,

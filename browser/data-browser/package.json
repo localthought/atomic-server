@@ -67,6 +67,7 @@
     "fast-json-patch": "^3.1.1",
     "idb-keyval": "^6.2.4",
     "katex": "^0.16.45",
+    "linkifyjs": "4.3.3",
     "loro-crdt": "^1.12.1",
     "ollama-ai-provider-v2": "^3.5.1",
     "polished": "^4.3.1",
@@ -144,8 +145,8 @@
     "lint-fix": "oxlint -c ../.oxlintrc.json --fix . && pnpm format",
     "preview": "vite preview",
     "start": "vite",
-    "test": "vitest run",
-    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.build.json",
+    "test": "vitest run --exclude scripts/integration-mcp.test.mjs && node --test scripts/integration-mcp.test.mjs",
+    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json",
     "clean-translations": "pnpm exec wuchale --clean"
   }
 }

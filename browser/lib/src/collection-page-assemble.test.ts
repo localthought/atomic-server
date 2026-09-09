@@ -48,6 +48,7 @@ function mockClientDb(
     isReady: true,
     waitForReady: async () => true,
     query,
+    flush: async () => undefined,
     putResourceWithSnapshot: async () => undefined,
   } as unknown as ClientDbWorker;
 }
@@ -72,6 +73,37 @@ function wireLiveMembership(store: Store, collection: Collection): () => void {
 }
 
 describe('collection page assemble does not flash unsorted members', () => {
+  it('requeries computed filters instead of admitting a row on stored properties alone', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const collection = new Collection(
+      store,
+      'https://example.com',
+      {
+        page_size: '30',
+        include_nested: false,
+        property: core.properties.parent,
+        value: TABLE,
+        expression_filters: [
+          {
+            expression: { kind: 'difference', from: 0, to: 10 },
+            operator: 'gte',
+            value: 100,
+          },
+        ],
+      },
+      true,
+    );
+    const resource = new Resource(ALICE);
+    resource.setStore(store);
+    await resource.set(core.properties.parent, TABLE, false);
+    expect(collection.applyResourceChange(ALICE, resource)).toBe(
+      'membership-stale',
+    );
+    expect(pageMembers(collection)).toEqual([]);
+  });
+
   it('does not optimistic-add hydrated members in query-arrival order', async ({
     expect,
   }) => {
@@ -250,5 +282,55 @@ describe('collection page assemble does not flash unsorted members', () => {
     await collection.refresh();
 
     expect(await collection.getMembersOnPage(0)).toEqual([ALICE, BOB]);
+  });
+});
+
+describe('deferred collection membership', () => {
+  it('does not count later pages again when hydration notifications are deferred', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setDrive(DRIVE);
+    const subjects = Array.from(
+      { length: 90 },
+      (_, i) => `did:ad:resource:row-${i}`,
+    );
+    store.setClientDb(
+      mockClientDb(async () => ({
+        subjects,
+        count: 90,
+        resources: subjects.map((s, i) => jsonAd(s, i)),
+      })),
+    );
+    const collection = new Collection(
+      store,
+      'https://example.com',
+      {
+        page_size: '30',
+        include_nested: false,
+        property: core.properties.parent,
+        value: TABLE,
+      },
+      true,
+    );
+    const unsubscribe = store.on(StoreEvents.ResourceUpdated, resource => {
+      queueMicrotask(() =>
+        collection.applyResourceChange(resource.subject, resource),
+      );
+    });
+
+    // Another collection can announce these records before this query resolves.
+    for (const subject of subjects.slice(30)) {
+      const resource = new Resource(subject);
+      resource.applyHydratedValues([[core.properties.parent, TABLE]]);
+      resource.loading = false;
+      collection.applyResourceChange(subject, resource);
+    }
+
+    await collection.refresh();
+    await Promise.resolve();
+    expect(collection.totalMembers).toBe(90);
+    expect(await collection.getMemberWithIndex(89)).toBeDefined();
+    unsubscribe();
   });
 });

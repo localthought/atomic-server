@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
-import { FaGear, FaInfo, FaCirclePlus, FaUser } from 'react-icons/fa6';
+import { FaGear, FaInfo, FaCirclePlus, FaUser, FaPlug } from 'react-icons/fa6';
 import { constructOpenURL } from '../../helpers/navigation';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { SideBarMenuItem } from './SideBarMenuItem';
@@ -11,6 +11,7 @@ import {
   useCurrentAgent,
   useResource,
 } from '@tomic/react';
+import { FeedbackMenuItem } from './FeedbackMenuItem';
 import { SyncMenuItem } from './SyncMenuItem';
 import { ResourceGlyph } from '../ResourceGlyph';
 import { DemoExitMenuItem } from '../DemoExitButton';
@@ -86,7 +87,15 @@ export function AppMenu({ onItemClick }: AppMenuProps): JSX.Element {
         path={paths.appSettings}
         onClick={onItemClick}
       />
+      <SideBarMenuItem
+        icon={<FaPlug />}
+        label='Integrations'
+        helper='Discover published integrations'
+        path={paths.integrations}
+        onClick={onItemClick}
+      />
       <SyncMenuItem onClick={onItemClick} />
+      <FeedbackMenuItem />
       <SideBarMenuItem
         icon={<FaInfo />}
         label='About'

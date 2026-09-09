@@ -1,6 +1,7 @@
 import { core, dataBrowser, StoreEvents, type Store } from '@tomic/lib';
 import {
   agentVaultProof,
+  canEnrollVault,
   getVaultState,
   listVaultDrives,
   recoverDriveKey,
@@ -16,7 +17,8 @@ import {
 } from './vault';
 import { loadVaultKeyOps } from './vaultKeyOps';
 import { getOrCreateDeviceId } from './devices';
-import { getManagedAccount } from './session';
+import { getManagedAccount, onManagedLogout } from './session';
+import { evaluateIdentityReconciliation } from './reconcile';
 import { nodeVault } from './nodeVault';
 import { isRunningInTauri } from '../tauri';
 
@@ -51,6 +53,9 @@ import { isRunningInTauri } from '../tauri';
 export type VaultAutoBackupDeps = {
   /** Whether a control-plane session exists. Nothing here works without one. */
   hasAccount: () => Promise<boolean>;
+  canEnroll?: typeof canEnrollVault;
+  /** Enrollment must wait until the local identity matches the portal account. */
+  identityMatches?: (agentSubject: string) => Promise<boolean>;
   loadKeys: () => Promise<VaultKeyOps & { proofMessage: Uint8Array }>;
   /** The lane this device writes to, or null when it has no identity yet. */
   laneId: () => Promise<string | null>;
@@ -110,6 +115,9 @@ export function isVaultOptedOut(driveSubject: string): boolean {
 }
 
 const defaultDeps: VaultAutoBackupDeps = {
+  canEnroll: canEnrollVault,
+  identityMatches: async subject =>
+    (await evaluateIdentityReconciliation(subject)).ok,
   // A self-hosted server answers `/api/me` with whatever it likes; that is
   // "no account", not a failure worth logging.
   hasAccount: async () =>
@@ -247,8 +255,24 @@ async function ensureVaultBackupOnce(
     return { status: 'skipped', reason: 'backup switched off for this drive' };
   }
 
+  const controller = new AbortController();
+  const { signal } = controller;
+  const stop = () => controller.abort();
+  const offAgent = store.on(StoreEvents.AgentChanged, next => {
+    if (next?.subject !== agent.subject) stop();
+  });
+  const offLogout = onManagedLogout(stop);
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', stop);
+
   try {
+    // Cached keys do not imply that the account session is still valid.
+    if (!(await deps.hasAccount())) {
+      return { status: 'skipped', reason: 'no account session' };
+    }
+
+    signal.throwIfAborted();
     const db = await deps.db(store);
+    signal.throwIfAborted();
     const lane = await deps.laneId();
 
     if (!db || !lane) {
@@ -273,19 +297,45 @@ async function ensureVaultBackupOnce(
     const metadataKey = JSON.stringify(metadata);
 
     if (!known || (known.metadata ?? '{}') !== metadataKey) {
-      if (!(await deps.hasAccount())) {
-        return { status: 'skipped', reason: 'no account session' };
+      if (
+        deps.identityMatches &&
+        !(await deps.identityMatches(agent.subject))
+      ) {
+        return {
+          status: 'skipped',
+          reason: 'account identity needs reconciliation',
+        };
+      }
+
+      signal.throwIfAborted();
+
+      if (deps.canEnroll && !(await deps.canEnroll(driveSubject, signal))) {
+        return {
+          status: 'skipped',
+          reason: 'drive backup belongs to another account',
+        };
       }
 
       const keys = await deps.loadKeys();
+      const proof = await agentVaultProof(agent, keys.proofMessage);
+
+      if (store.getAgent()?.subject !== agent.subject) {
+        return {
+          status: 'skipped',
+          reason: 'identity changed during backup setup',
+        };
+      }
+
+      signal.throwIfAborted();
       const { enrollment, driveKey, keyEpoch } = await deps.setUpVaultForDrive({
+        signal,
         keys,
         driveSubject,
         metadata,
         agentSubject: agent.subject,
         // The agent signs a fixed message; its key is never read. That is what
         // keeps non-extractable and hardware-backed keys usable here.
-        agentSecret: await agentVaultProof(agent, keys.proofMessage),
+        agentSecret: proof,
       });
       known = {
         drivePseudonym: enrollment.drive_pseudonym,
@@ -296,8 +346,17 @@ async function ensureVaultBackupOnce(
       enrolled.set(driveSubject, known);
     }
 
+    if (store.getAgent()?.subject !== agent.subject) {
+      return {
+        status: 'skipped',
+        reason: 'identity changed during backup setup',
+      };
+    }
+
+    signal.throwIfAborted();
     const held = known;
     const outcome = await deps.runVaultBackup({
+      signal,
       db,
       driveSubject,
       drivePseudonym: held.drivePseudonym,
@@ -321,6 +380,7 @@ async function ensureVaultBackupOnce(
         return fresh;
       },
     });
+    signal.throwIfAborted();
     notifyVaultChanged(driveSubject);
 
     return outcome;
@@ -328,24 +388,32 @@ async function ensureVaultBackupOnce(
     // A stale key or enrollment must not be reused after a failure; the next
     // attempt re-derives both from the control plane.
     enrolled.delete(driveSubject);
+
+    if (signal.aborted) {
+      return {
+        status: 'skipped',
+        reason: 'backup cancelled by account change',
+      };
+    }
+
     console.warn('[cloud-vault] backup failed', error);
 
     return {
       status: 'failed',
       error: error instanceof Error ? error : new Error(String(error)),
     };
+  } finally {
+    offAgent();
+    offLogout();
+    if (typeof window !== 'undefined')
+      window.removeEventListener('pagehide', stop);
   }
 }
 
-/**
- * How long after the last edit a backup runs.
- *
- * Every pass currently seals the whole drive (incremental export is a
- * follow-up), so this is deliberately not "a few seconds": a burst of typing
- * should cost one upload, not one per pause. Going to the background flushes
- * it early, since a tab that is closing has no later.
- */
-export const AUTO_BACKUP_IDLE_MS = 60_000;
+/** Incremental packs make short idle backups cheap; unchanged drives upload nothing. */
+export const AUTO_BACKUP_IDLE_MS = 5_000;
+export const AUTO_BACKUP_MAX_WAIT_MS = 30_000;
+export const AUTO_BACKUP_RETRY_MS = 60_000;
 
 export type VaultRestoreOutcome =
   | { status: 'restored'; outcome: RestoreOutcome }
@@ -442,28 +510,32 @@ export async function restoreFromVault(
   }
 }
 
+/** Local Tauri data lives in its embedded node, not the browser's local-only registry. */
+export function isEmbeddedVaultDrive(store: Store): boolean {
+  if (!isRunningInTauri()) return false;
+
+  return ['localhost', '127.0.0.1', '[::1]'].includes(
+    new URL(store.getServerUrl()).hostname,
+  );
+}
+
 /**
- * Keep the open drive backed up as it changes.
- *
- * Listens for the store's own save/remove events — the user's edits, not
- * remote pushes — and runs {@link ensureVaultBackup} for the drive that is open
- * once the edits stop. That drive rather than the edited resource's, because a
- * resource's drive is the root of a parent chain that may not be loaded, and
- * edits happen in the drive on screen in all but contrived cases.
- *
- * Only drives that are local-only, or that this session already enrolled, are
- * backed up from here. A drive on a managed node is synced by that node and
- * needs no second copy; a drive on somebody else's server is not ours to back
- * up at all.
- *
- * Returns the unsubscribe function.
+ * Incremental backups while the app is running. Keep every edited drive queued,
+ * cap the debounce, and retry after account/network recovery without another edit.
+ * Remote drives are only backed up when already enrolled with this account.
  */
 export function watchForVaultBackups(
   store: Store,
   deps: VaultAutoBackupDeps = defaultDeps,
-  options: { idleMs?: number; window?: Window | null } = {},
+  options: {
+    idleMs?: number;
+    maxWaitMs?: number;
+    retryMs?: number;
+    window?: Window | null;
+  } = {},
 ): () => void {
   const idleMs = options.idleMs ?? AUTO_BACKUP_IDLE_MS;
+  const maxWaitMs = options.maxWaitMs ?? AUTO_BACKUP_MAX_WAIT_MS;
   const win =
     options.window === undefined
       ? typeof window === 'undefined'
@@ -471,53 +543,124 @@ export function watchForVaultBackups(
         : window
       : options.window;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let pending: string | undefined;
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  let stopped = false;
+  let generation = 0;
+  const pending = new Set<string>();
 
   const flush = () => {
-    if (timer) clearTimeout(timer);
+    clearTimeout(timer);
+    clearTimeout(deadline);
+    timer = deadline = undefined;
+    const drives = [...pending];
+    pending.clear();
+    const identity = store.getAgent()?.subject;
+    const passGeneration = generation;
 
-    timer = undefined;
-    const drive = pending;
-    pending = undefined;
+    if (!identity) return;
 
-    if (drive) void ensureVaultBackup(store, drive, deps);
+    void (async () => {
+      // Avoid enrollment discovery requests when signed out. Keep work queued
+      // so a reconnect or periodic retry can finish it later.
+      const retry = (drive: string) => {
+        if (
+          !stopped &&
+          passGeneration === generation &&
+          store.getAgent()?.subject === identity
+        )
+          pending.add(drive);
+      };
+
+      try {
+        if (!drives.length || stopped || !(await deps.hasAccount())) {
+          drives.forEach(retry);
+
+          return;
+        }
+
+        const remote = drives.filter(
+          drive =>
+            !store.isLocalOnlyDrive(drive) &&
+            !enrolled.has(drive) &&
+            !isEmbeddedVaultDrive(store),
+        );
+        const existing = remote.length ? await deps.listVaultDrives() : [];
+
+        for (const drive of drives) {
+          if (
+            stopped ||
+            passGeneration !== generation ||
+            store.getAgent()?.subject !== identity
+          )
+            return;
+          if (
+            remote.includes(drive) &&
+            !existing.some(item => item.drive_subject === drive)
+          )
+            continue;
+          const outcome = await ensureVaultBackup(store, drive, deps);
+          if (outcome.status === 'failed' || outcome.status === 'skipped')
+            retry(drive);
+        }
+      } catch {
+        // Discovery can fail offline; the next bounded retry rechecks it.
+        drives.forEach(retry);
+      }
+    })();
   };
 
   const schedule = () => {
     const drive = store.getDrive();
-
-    if (!drive) return;
-    if (!store.isLocalOnlyDrive(drive) && !enrolled.has(drive)) return;
-
-    pending = drive;
-
-    if (timer) clearTimeout(timer);
-
+    if (!drive || stopped) return;
+    pending.add(drive);
+    clearTimeout(timer);
     timer = setTimeout(flush, idleMs);
+    deadline ??= setTimeout(flush, maxWaitMs);
   };
 
-  // A tab going to the background may never come back. The upload is not
-  // guaranteed to finish, but a backup that starts has a chance; one scheduled
-  // for later has none.
-  const onHidden = () => {
+  const resume = () => {
+    schedule();
+    flush();
+  };
+
+  const onVisibility = () => {
     if (win?.document.visibilityState === 'hidden') flush();
+    else resume();
+  };
+
+  const reset = () => {
+    generation++;
+    enrolled.clear();
+    pending.clear();
+    clearTimeout(timer);
+    clearTimeout(deadline);
+    timer = deadline = undefined;
+    schedule();
   };
 
   const unsubscribe = [
     store.on(StoreEvents.ResourceSaved, schedule),
     store.on(StoreEvents.ResourceRemoved, schedule),
     store.on(StoreEvents.ResourceManuallyCreated, schedule),
+    store.on(StoreEvents.DriveChanged, schedule),
+    store.on(StoreEvents.AgentChanged, reset),
+    onManagedLogout(reset),
   ];
-  win?.document.addEventListener('visibilitychange', onHidden);
-  win?.addEventListener('pagehide', flush);
+  // Also catches native-node changes that do not emit browser Store events,
+  // and accounts linked after the initial mount. No-change passes upload nothing.
+  const periodic = setInterval(resume, options.retryMs ?? AUTO_BACKUP_RETRY_MS);
+  win?.document.addEventListener('visibilitychange', onVisibility);
+  win?.addEventListener('online', resume);
+  schedule();
 
   return () => {
-    if (timer) clearTimeout(timer);
-
-    timer = undefined;
-    pending = undefined;
+    stopped = true;
+    clearTimeout(timer);
+    clearTimeout(deadline);
+    clearInterval(periodic);
+    pending.clear();
     unsubscribe.forEach(off => off());
-    win?.document.removeEventListener('visibilitychange', onHidden);
-    win?.removeEventListener('pagehide', flush);
+    win?.document.removeEventListener('visibilitychange', onVisibility);
+    win?.removeEventListener('online', resume);
   };
 }

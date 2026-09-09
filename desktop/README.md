@@ -98,3 +98,30 @@ which every later build shares.
 
 - No way to pass flags to `atomic-sever` using the Tauri executable (although you can set ENV variables)
 - No HTTPS support
+
+### Error reporting in official packages
+
+The release workflow enables Sentry for the embedded WebView on every platform,
+including Android and iOS. Tag builds use `production`; manual workflow builds
+use `staging`. Reports carry the app version and source commit. JavaScript/React
+errors and sidebar feedback are covered; native process crashes are not covered
+by this browser SDK. Local builds can opt in with `VITE_SENTRY_DSN` and
+`VITE_SENTRY_ENVIRONMENT`. See the SaaS `SENTRY.md` runbook for receipt verification.
+
+Android launcher images are generated from `brand/src/atomic-mark.svg` by
+`node brand/generate.mjs`, including adaptive foregrounds at every density.
+
+### Automatic Cloud Vault backup
+
+With a linked, eligible account, the open local drive is enrolled and backed up
+without a setup click. Tauri's embedded-node drives count as local data; unrelated
+remote drives are excluded unless already enrolled with this account. The personal
+drive is retried after startup too, so late account linking does not require a restart.
+Explicit backup opt-outs and account eligibility checks remain authoritative.
+
+The browser and Tauri watcher uses incremental packs: 5 seconds after editing
+stops, or at most 30 seconds during sustained editing. Switching drives preserves
+queued work. Foregrounding/reconnecting retries immediately; a 60-second check
+also catches native-node changes and late account availability. Unchanged drives
+upload no object. These timers run only while the app runtime can execute; they
+are not an Android/iOS OS background service. Manual backup remains a retry option.
