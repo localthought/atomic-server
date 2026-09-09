@@ -630,11 +630,17 @@ fn build_plugin_runtime() {
         return;
     }
 
+    // Nested Cargo must not share the outer build directory lock. OUT_DIR is
+    // absolute and also keeps this cache scoped to the server build.
+    let runtime_target = PathBuf::from(&out_dir).join("plugin-runtime-target");
+
     // Always release: a debug build of QuickJS is ~8MB against ~1.2MB, and this
     // is embedded in every server binary including debug ones.
     let built =
         std::process::Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()))
             .args(["build", "-p", CRATE, "--release", "--target", TARGET])
+            .arg("--target-dir")
+            .arg(&runtime_target)
             // Cargo sets these for *this* build; leaking them into the nested one
             // makes it try to reuse the host target dir and deadlock.
             .env_remove("CARGO_ENCODED_RUSTFLAGS")
@@ -643,7 +649,7 @@ fn build_plugin_runtime() {
             .current_dir("..")
             .status();
 
-    let artifact = PathBuf::from("../target")
+    let artifact = runtime_target
         .join(TARGET)
         .join("release/atomic_plugin_runtime.wasm");
 

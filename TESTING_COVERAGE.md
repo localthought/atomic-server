@@ -15,6 +15,12 @@ caught it, and if the answer is "none", that is the row to add.
 
 ## How to read this
 
+Build orchestration gap: runtime sandbox tests exercise the embedded component,
+but do not detect nested Cargo build-directory lock contention in `server/build.rs`.
+The Heroku deployment fix was checked with a minimal nested Cargo workspace:
+a shared target directory stalled; a separate target directory completed.
+There is no permanent automated regression test for this build orchestration yet.
+
 Clockify: `integrations/clockify/plugin.test.ts` covers linked proposals, time
 instants, repeat imports, pagination and failure handling.
 `plugins::clockify_tests::completed_entries_are_proposals_in_the_real_sandbox`
