@@ -21,11 +21,27 @@ import {
 test.describe('plugins', () => {
   test.beforeEach(before);
 
-  test('Pets installs its demo table after the reviewed import is applied', async ({
+  test('Pets imports from the mock integration proxy after account connection and review', async ({
     page,
   }) => {
-    await page.getByRole('link', { name: 'Integrations', exact: true }).click();
+    test.skip(
+      !process.env.ATOMIC_MOCK_INTEGRATION_PROXY,
+      'Run with the documented mock integration-proxy server configuration',
+    );
 
+    // CI's browser and server are in different containers. Forward the mock's
+    // loopback address to the server container before catalog loading starts.
+    if (process.env.ATOMIC_SERVICE_URL)
+      await page.route('http://127.0.0.1:19090/**', async route => {
+        const target = new URL(route.request().url());
+        target.hostname = new URL(process.env.ATOMIC_SERVICE_URL!).hostname;
+        const response = await route.fetch({
+          url: target.href,
+          maxRedirects: 0,
+        });
+        await route.fulfill({ response });
+      });
+    await page.getByRole('link', { name: 'Integrations', exact: true }).click();
     const pets = page.locator('[data-integration=pets]');
     await expect(
       pets.getByRole('heading', { name: 'Pets', exact: true }),
@@ -34,27 +50,70 @@ test.describe('plugins', () => {
 
     const setup = page.locator('dialog[open]');
     await expect(
-      setup.getByRole('button', { name: 'Install demo pets', exact: true }),
+      setup.getByRole('button', { name: 'Install and connect', exact: true }),
     ).toBeVisible();
     await setup
-      .getByRole('button', { name: 'Install demo pets', exact: true })
+      .getByLabel('LocalThought tenant secret')
+      .fill('bW9jay10ZW5hbnQ.mock-signature');
+    await setup
+      .getByRole('button', { name: 'Install and connect', exact: true })
       .click();
 
+    await expect(
+      page.getByRole('heading', { name: 'Mock integration proxy' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Connect test account' }).click();
+    await expect(page).not.toHaveURL(/connection_code=/);
+    await page.getByRole('button', { name: 'Fetch and preview' }).click();
+
     const review = page.locator('dialog[open]');
+    // The browser creates the local ontology, tables and reviewed proposal.
+    // Allow the one-time installation more than the interaction timeout.
     await expect(
       review.getByRole('button', { name: 'Apply 5 changes', exact: true }),
-    ).toBeEnabled();
+    ).toBeEnabled({ timeout: 45_000 });
     await review
       .getByRole('button', { name: 'Apply 5 changes', exact: true })
       .click();
 
-    await page.getByRole('link', { name: 'Open Pets', exact: true }).click();
+    await page
+      .getByRole('link', { name: 'Open imported records', exact: true })
+      .click();
     const main = page.getByRole('main');
     await expect(
       main.getByRole('heading', { name: 'Pets', exact: true }),
     ).toBeVisible();
     for (const name of ['Rex', 'Whiskers', 'Tweety', 'Nibbles', 'Bubbles'])
-      await expect(main.getByText(name, { exact: true })).toBeVisible();
+      await expect(main.getByText(name, { exact: true }).first()).toBeVisible();
+    // Numeric and boolean properties must retain their Atomic datatype, not become JSON blobs.
+    const datatypes = await page.evaluate(async () => {
+      const store = window.store!;
+      const table = await store.getResource(
+        new URL(location.href).searchParams.get('subject')!,
+      );
+      const klass = await store.getResource(
+        table.get('https://atomicdata.dev/properties/classtype') as string,
+      );
+      const fields = klass.get(
+        'https://atomicdata.dev/properties/recommends',
+      ) as string[];
+      const properties = await Promise.all(
+        fields.map(s => store.getResource(s)),
+      );
+
+      return Object.fromEntries(
+        properties.map(p => [
+          p.get('https://atomicdata.dev/properties/name'),
+          p.get('https://atomicdata.dev/properties/datatype'),
+        ]),
+      );
+    });
+    expect(datatypes).toMatchObject({
+      age: 'https://atomicdata.dev/datatypes/integer',
+      vaccinated: 'https://atomicdata.dev/datatypes/boolean',
+      weight: 'https://atomicdata.dev/datatypes/float',
+      'updated at': 'https://atomicdata.dev/datatypes/timestamp',
+    });
   });
 
   test('a published release is discoverable and creates an independent draft', async ({
@@ -248,7 +307,7 @@ export function run() { return { intents: [] }; }
       await expect(
         page
           .getByRole('main')
-          .getByRole('heading', { name: /Notion data source/, level: 1 }),
+          .getByRole('heading', { name: /Notion rows/, level: 1 }),
       ).toBeVisible();
       expect(credentialBindings).toBe(1);
     });
@@ -288,10 +347,10 @@ export function run() { return { intents: [] }; }
 
     await expect(
       page.getByText('Offline checks passed:', { exact: false }),
-    ).toHaveCount(4);
+    ).toHaveCount(3);
     await expect(
       page.getByText('Live provider checks are not included in these results.'),
-    ).toHaveCount(4);
+    ).toHaveCount(3);
     await page
       .locator('details')
       .filter({ hasText: 'Repository test results' })
@@ -719,6 +778,9 @@ export function run() { return { intents: [] }; }
       .locator('[data-integration=github-issues]')
       .getByRole('button', { name: 'Set up connection' })
       .click();
+    await page
+      .getByRole('button', { name: 'Use a direct GitHub token instead' })
+      .click();
     await expect(page.getByLabel('Sync into')).toContainText(
       'Shared project tasks',
     );
@@ -734,11 +796,7 @@ export function run() { return { intents: [] }; }
     await page
       .getByRole('button', { name: 'Connect GitHub', exact: true })
       .click();
-    await expect(
-      page.getByRole('heading', {
-        name: /GitHub issues: atomic-fixtures\/shared-tasks/,
-      }),
-    ).toBeVisible();
+    await expect(page).toHaveURL(tableUrl);
     await page.goto(tableUrl);
     await expect(
       page.getByRole('heading', { name: 'Shared project tasks', exact: true }),
@@ -764,6 +822,9 @@ export function run() { return { intents: [] }; }
       .getByRole('button', { name: 'Set up connection' })
       .click();
     await page
+      .getByRole('button', { name: 'Use a direct GitHub token instead' })
+      .click();
+    await page
       .getByLabel('Repository', { exact: true })
       .fill('atomic-fixtures/issues');
     await page
@@ -771,6 +832,12 @@ export function run() { return { intents: [] }; }
       .fill('local-install-test-token');
     await page
       .getByRole('button', { name: 'Connect GitHub', exact: true })
+      .click();
+    await page
+      .getByRole('button', { name: 'Connections', exact: true })
+      .click();
+    await page
+      .getByRole('link', { name: 'Connection settings', exact: true })
       .click();
     await expect(
       page.getByRole('heading', {
@@ -833,9 +900,9 @@ export function run() { return { intents: [] }; }
     await page.getByText('Action history', { exact: true }).click();
     await expect(page.getByText('Cancelled', { exact: true })).toBeVisible();
     const callerSubject = await page.evaluate(async () => {
-      const store = (window as any).store;
+      const store = window.store;
       const connection = await store.getResource(
-        new URL(location.href).searchParams.get('subject'),
+        new URL(location.href).searchParams.get('subject')!,
       );
       const drive = await store.getResource(
         connection.get('https://atomicdata.dev/properties/parent'),
@@ -855,7 +922,7 @@ export function run() { return { intents: [] }; }
       const term = (n: string) =>
         terms.find(
           r => r.get('https://atomicdata.dev/properties/shortname') === n,
-        ).subject;
+        )!.subject;
       const caller = await store.newResource({
         parent: drive.subject,
         isA: [term('plugin-script')],
@@ -1155,11 +1222,11 @@ export async function run(ctx) {
     ).toBeVisible();
     await page.evaluate(
       async ({ release }) => {
-        const store = (window as any).store;
+        const store = window.store;
         if (!(await store.waitForServerConnected(10000)))
           throw new Error('Test server did not connect');
         const plugin = await store.getResource(
-          new URL(location.href).searchParams.get('subject'),
+          new URL(location.href).searchParams.get('subject')!,
         );
         const drive = await store.getResource(
           plugin.get('https://atomicdata.dev/properties/parent'),
@@ -1171,7 +1238,7 @@ export async function run(ctx) {
         );
         const properties = await Promise.all(
           ontology
-            .get('https://atomicdata.dev/properties/properties')
+            .get('https://atomicdata.dev/properties/properties')!
             .map((p: string) => store.getResource(p)),
         );
         const property = properties.find(
@@ -1179,6 +1246,7 @@ export async function run(ctx) {
             p.get('https://atomicdata.dev/properties/shortname') ===
             'plugin-connection',
         );
+        if (!property) throw new Error('Missing plugin-connection property');
         const room = await store.newResource({
           parent: drive.subject,
           isA: ['https://atomicdata.dev/classes/ChatRoom'],
@@ -1249,9 +1317,9 @@ export async function run(ctx) {
       fullPage: true,
     });
     const target = await page.evaluate(async () => {
-      const store = (window as any).store;
+      const store = window.store;
       const plugin = await store.getResource(
-        new URL(location.href).searchParams.get('subject'),
+        new URL(location.href).searchParams.get('subject')!,
       );
 
       return {
@@ -1285,9 +1353,9 @@ export async function run(ctx) {
     ).toBeVisible();
     const automationSubject = new URL(page.url()).searchParams.get('subject')!;
     const relationship = await page.evaluate(async () => {
-      const store = (window as any).store;
+      const store = window.store;
       const script = await store.getResource(
-        new URL(location.href).searchParams.get('subject'),
+        new URL(location.href).searchParams.get('subject')!,
       );
       const values = script.getPropVals();
 

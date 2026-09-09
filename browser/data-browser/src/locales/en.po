@@ -551,6 +551,7 @@ msgstr "Optional HTTP headers to send when connecting to this MCP server"
 #: src/actions/resourceActions.tsx
 #: src/actions/resourceActions.tsx src/chunks/AI/AgentConfigItem.tsx
 #: src/chunks/AI/AgentConfigItem.tsx
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/TablePage/DerivedColumnHeading.tsx
 #: src/chunks/TablePage/RowActionHeading.tsx
 #: src/chunks/TablePage/TableHeadingMenu.tsx
@@ -850,8 +851,10 @@ msgid "Learn more & get involved"
 msgstr "Learn more & get involved"
 
 #. 0: metadata.version
+#. 0: metadata.version
 #. 0: __APP_VERSION__
 #. 0: resource.props.version
+#: src/chunks/Plugins/NewPluginButton.tsx
 #: src/chunks/Plugins/NewPluginButton.tsx src/routes/AboutRoute.tsx
 #: src/routes/AboutRoute.tsx
 #: src/views/Plugin/PluginPage.tsx
@@ -1415,7 +1418,9 @@ msgid "Keyboard shortcuts"
 msgstr "Keyboard shortcuts"
 
 #. 0: metadata.author
+#. 0: metadata.author
 #. 0: resource.props.pluginAuthor
+#: src/chunks/Plugins/NewPluginButton.tsx
 #: src/chunks/Plugins/NewPluginButton.tsx src/views/Plugin/PluginPage.tsx
 #: src/views/Plugin/PluginPage.tsx
 msgid "by {0}"
@@ -4710,6 +4715,7 @@ msgstr "{0}% used"
 msgid "Syncing…"
 msgstr "Syncing…"
 
+#: src/routes/DevonianDemoRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Sync now"
 msgstr "Sync now"
@@ -4802,10 +4808,13 @@ msgstr "Pairing device"
 
 #: src/chunks/AI/RealAIChat.tsx
 #: src/chunks/AI/RealAIChat.tsx src/components/pairing/PairingFlowProvider.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Try again"
 msgstr "Try again"
 
+#: src/chunks/PluginRuns/ConnectedIntegration.tsx
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Open workspace"
 msgstr "Open workspace"
@@ -6290,6 +6299,7 @@ msgid "Keep an encrypted copy of this workspace in {0}. It is sealed on this dev
 msgstr "Keep an encrypted copy of this workspace in {0}. It is sealed on this device, so we store it without being able to read it."
 
 #: src/components/Vault/VaultPanel.tsx
+#: src/routes/DevonianDemoRoute.tsx
 msgid "Working…"
 msgstr "Working…"
 
@@ -7297,6 +7307,7 @@ msgid "Enable keyboard drag & drop in sidebar"
 msgstr "Enable keyboard drag & drop in sidebar"
 
 #: src/chunks/Plugins/NewPluginButton.tsx
+#: src/chunks/Plugins/NewPluginButton.tsx
 msgid "Upload Plugin"
 msgstr "Upload Plugin"
 
@@ -7399,6 +7410,7 @@ msgstr "New plugin"
 msgid "Create a plugin here. It proposes changes that you review before anything is written."
 msgstr "Create a plugin here. It proposes changes that you review before anything is written."
 
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginRunHistory.tsx
 #: src/chunks/PluginRuns/PluginView.tsx
 #: src/routes/NewResource/NewRoute.tsx
@@ -7476,6 +7488,7 @@ msgstr "No secrets stored."
 msgid "Not signed in"
 msgstr "Not signed in"
 
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginPage.tsx src/chunks/PluginRuns/PluginView.tsx
 msgid "Source"
 msgstr "Source"
@@ -7484,6 +7497,7 @@ msgstr "Source"
 msgid "<0/> Run"
 msgstr "<0/> Run"
 
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginPage.tsx src/chunks/PluginRuns/PluginView.tsx
 msgid "This plugin has no source yet."
 msgstr "This plugin has no source yet."
@@ -7624,7 +7638,6 @@ msgid "Button.tsx"
 msgstr "Button.tsx"
 
 #: src/chunks/AppPage/AppFrame.tsx
-#: src/chunks/AppPage/index.tsx
 msgid "This app has no entry point, so there is nothing to open."
 msgstr "This app has no entry point, so there is nothing to open."
 
@@ -7679,8 +7692,9 @@ msgstr "Integrations"
 msgid "Discover published integrations"
 msgstr "Discover published integrations"
 
-#~ msgid "Publish to integration store"
-#~ msgstr "Publish to integration store"
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "Publish to integration store"
+msgstr "Publish to integration store"
 
 #: src/chunks/PluginRuns/PluginSchedule.tsx
 msgid "Review the saved proposal and run history before continuing."
@@ -7748,7 +7762,6 @@ msgstr "Preview sync"
 msgid "Sync complete."
 msgstr "Sync complete."
 
-#: src/routes/IntegrationStore.tsx
 #: src/routes/IntegrationStore.tsx
 msgid "Your integrations"
 msgstr "Your integrations"
@@ -7842,7 +7855,6 @@ msgstr "events queued. They remain saved while waiting for review."
 msgid "Creating automation…"
 msgstr "Creating automation…"
 
-#: src/chunks/PluginRuns/ConnectedIntegration.tsx
 #: src/chunks/PluginRuns/CreateEventAutomation.tsx
 msgid "Create automation"
 msgstr "Create automation"
@@ -7850,6 +7862,8 @@ msgstr "Create automation"
 #: src/chunks/PluginRuns/CreateEventAutomation.tsx
 #: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginPage.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
 msgid "Automations"
 msgstr "Automations"
 
@@ -7958,25 +7972,20 @@ msgstr "Automation name"
 msgid "The next screen opens an editable JavaScript starter. Automatic execution stays off until you enable it."
 msgstr "The next screen opens an editable JavaScript starter. Automatic execution stays off until you enable it."
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "GitHub issues"
-msgstr "GitHub issues"
+#~ msgid "GitHub issues"
+#~ msgstr "GitHub issues"
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Keep GitHub issues and your kanban board in sync."
-msgstr "Keep GitHub issues and your kanban board in sync."
+#~ msgid "Keep GitHub issues and your kanban board in sync."
+#~ msgstr "Keep GitHub issues and your kanban board in sync."
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Sync titles, descriptions and status in both directions. Create issues from either app."
-msgstr "Sync titles, descriptions and status in both directions. Create issues from either app."
+#~ msgid "Sync titles, descriptions and status in both directions. Create issues from either app."
+#~ msgstr "Sync titles, descriptions and status in both directions. Create issues from either app."
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Start automations when a new issue is discovered."
-msgstr "Start automations when a new issue is discovered."
+#~ msgid "Start automations when a new issue is discovered."
+#~ msgstr "Start automations when a new issue is discovered."
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Issues only. Comments and pull requests are not synced."
-msgstr "Issues only. Comments and pull requests are not synced."
+#~ msgid "Issues only. Comments and pull requests are not synced."
+#~ msgstr "Issues only. Comments and pull requests are not synced."
 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
 msgid "Notion"
@@ -8003,6 +8012,7 @@ msgid "Supported scope"
 msgstr "Supported scope"
 
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
 msgid "Set up connection"
 msgstr "Set up connection"
 
@@ -8493,7 +8503,6 @@ msgid "Bring your completed entries into the Time Tracker template, linked to pr
 msgstr "Bring your completed entries into the Time Tracker template, linked to projects and the person who logged them. Review every proposed import first."
 
 #: src/chunks/PluginRuns/ConnectClockify.tsx
-#: src/chunks/PluginRuns/PluginPage.tsx
 msgid "Workspace"
 msgstr "Workspace"
 
@@ -9509,17 +9518,15 @@ msgstr "Activity"
 msgid "Code"
 msgstr "Code"
 
-#: src/chunks/PluginRuns/IntegrationDataView.tsx
-msgid "Loading your data…"
-msgstr "Loading your data…"
+#~ msgid "Loading your data…"
+#~ msgstr "Loading your data…"
 
 #: src/chunks/PluginRuns/IntegrationDataView.tsx
 msgid "Opening view"
 msgstr "Opening view"
 
-#: src/chunks/PluginRuns/IntegrationDataView.tsx
-msgid "Choose which view opens when you visit this integration or its table."
-msgstr "Choose which view opens when you visit this integration or its table."
+#~ msgid "Choose which view opens when you visit this integration or its table."
+#~ msgstr "Choose which view opens when you visit this integration or its table."
 
 #: src/chunks/PluginRuns/PluginPage.tsx
 msgid "Edit with AI"
@@ -9537,28 +9544,73 @@ msgstr "Applying sync…"
 msgid "Checking for changes. This may take a moment."
 msgstr "Checking for changes. This may take a moment."
 
-#: src/chunks/PluginRuns/ConnectPets.tsx
-#: src/chunks/PluginRuns/ConnectPets.tsx
-#: src/chunks/PluginRuns/ConnectPets.tsx
+#: src/routes/IntegrationStore.tsx
+msgid "Your connections"
+msgstr "Your connections"
+
+#: src/chunks/PluginRuns/ConnectedIntegration.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connection settings"
+msgstr "Connection settings"
+
+#: src/chunks/PluginRuns/AutomationWorkspace.tsx
+msgid "On demand"
+msgstr "On demand"
+
+#: src/chunks/PluginRuns/IntegrationDataView.tsx
+msgid "Choose which view opens when you visit this workspace."
+msgstr "Choose which view opens when you visit this workspace."
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connections"
+msgstr "Connections"
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Loading workspace…"
+msgstr "Loading workspace…"
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "No connections yet."
+msgstr "No connections yet."
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "No automations yet."
+msgstr "No automations yet."
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connect services to this workspace. Your data and views stay here when sync is paused."
+msgstr "Connect services to this workspace. Your data and views stay here when sync is paused."
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Connect a service"
+msgstr "Connect a service"
+
+#: src/chunks/PluginRuns/WorkspaceControls.tsx
+msgid "Automations act on your data and can use connected services. Sync works independently."
+msgstr "Automations act on your data and can use connected services. Sync works independently."
+
 #: src/chunks/PluginRuns/IntegrationDiscovery.tsx
+msgid "This integration creates a new workspace for its imported data."
+msgstr "This integration creates a new workspace for its imported data."
+
+#: src/chunks/PluginRuns/ConnectPets.tsx
+#: src/chunks/PluginRuns/ConnectPets.tsx
+#: src/chunks/PluginRuns/ConnectPets.tsx
 msgid "Pets"
 msgstr "Pets"
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "A trivial demo collection, useful for trying plugins out."
-msgstr "A trivial demo collection, useful for trying plugins out."
+#~ msgid "A trivial demo collection, useful for trying plugins out."
+#~ msgstr "A trivial demo collection, useful for trying plugins out."
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
-msgstr "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
+#~ msgid "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
+#~ msgstr "Imports five static demo pets into a Pets table with a small ontology (species, breed, age, mood)."
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "A one-off, on-demand import. Nothing runs in the background."
-msgstr "A one-off, on-demand import. Nothing runs in the background."
+#~ msgid "A one-off, on-demand import. Nothing runs in the background."
+#~ msgstr "A one-off, on-demand import. Nothing runs in the background."
 
-#: src/chunks/PluginRuns/IntegrationDiscovery.tsx
-msgid "No external account, API key or network call. Static sample data only, not a live provider."
-msgstr "No external account, API key or network call. Static sample data only, not a live provider."
+#~ msgid "No external account, API key or network call. Static sample data only, not a live provider."
+#~ msgstr "No external account, API key or network call. Static sample data only, not a live provider."
 
 #: src/chunks/PluginRuns/ConnectPets.tsx
 msgid "Reinstall demo pets"
@@ -9575,3 +9627,202 @@ msgstr "Installs five trivial demo pets into a Pets table. No external account, 
 #: src/chunks/PluginRuns/ConnectPets.tsx
 msgid "Open Pets"
 msgstr "Open Pets"
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Loading LocalThought platforms…"
+msgstr "Loading LocalThought platforms…"
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Connect your account through LocalThought and import records into your drive."
+msgstr "Connect your account through LocalThought and import records into your drive."
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Use a direct GitHub token instead"
+msgstr "Use a direct GitHub token instead"
+
+#: src/chunks/PluginRuns/LocalThoughtCatalog.tsx
+msgid "Loading setup…"
+msgstr "Loading setup…"
+
+#~ msgid "Provider data"
+#~ msgstr "Provider data"
+
+#~ msgid "Original JSON returned by the connected platform."
+#~ msgstr "Original JSON returned by the connected platform."
+
+#~ msgid "API record"
+#~ msgstr "API record"
+
+#~ msgid "A record imported from a connected platform."
+#~ msgstr "A record imported from a connected platform."
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Reconnect account"
+msgstr "Reconnect account"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Install and connect"
+msgstr "Install and connect"
+
+#~ msgid "Repository (owner/repository)"
+#~ msgstr "Repository (owner/repository)"
+
+#~ msgid "Calendar ID"
+#~ msgstr "Calendar ID"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Fetching…"
+msgstr "Fetching…"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Fetch and preview"
+msgstr "Fetch and preview"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Connect your personal account through LocalThought, then return here to preview an import."
+msgstr "Connect your personal account through LocalThought, then return here to preview an import."
+
+#~ msgid "Imports the first page only. Review changes before applying them. Repeated imports preserve local edits. No background sync or provider writes."
+#~ msgstr "Imports the first page only. Review changes before applying them. Repeated imports preserve local edits. No background sync or provider writes."
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Open imported records"
+msgstr "Open imported records"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
+msgstr "Imports the collections described by the platform, following pagination. Review changes before applying them. No background sync or provider writes."
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Events from (UTC)"
+msgstr "Events from (UTC)"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "Events before (UTC)"
+msgstr "Events before (UTC)"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+#: src/routes/DevonianDemoRoute.tsx
+msgid "LocalThought tenant secret"
+msgstr "LocalThought tenant secret"
+
+#: src/chunks/PluginRuns/ConnectLocalThought.tsx
+msgid "The tenant secret is used in this tab. Connection credentials stay in this browser."
+msgstr "The tenant secret is used in this tab. Connection credentials stay in this browser."
+
+#. 0: count
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Synchronized {0} issues and comments."
+msgstr "Synchronized {0} issues and comments."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Integration proxy URL"
+msgstr "Integration proxy URL"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "GitHub repository (owner/repo)"
+msgstr "GitHub repository (owner/repo)"
+
+#~ msgid "Connection code"
+#~ msgstr "Connection code"
+
+#~ msgid "The proxy must allow this app’s origin through CORS and expose X-Connection-Code. Use a fresh GitHub connection code from the proxy’s OAuth flow."
+#~ msgstr "The proxy must allow this app’s origin through CORS and expose X-Connection-Code. Use a fresh GitHub connection code from the proxy’s OAuth flow."
+
+#~ msgid "Open live tracker"
+#~ msgstr "Open live tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect a real GitHub repository"
+msgstr "Connect a real GitHub repository"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Devonian issue tracker demo"
+msgstr "Devonian issue tracker demo"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sync issues and comments in both directions. Devonian runs in this browser; the Atomic tracker is stored on this device."
+msgstr "Sync issues and comments in both directions. Devonian runs in this browser; the Atomic tracker is stored on this device."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Try sample data"
+msgstr "Try sample data"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample mode: the GitHub side below is a browser fixture. No requests are sent to GitHub."
+msgstr "Sample mode: the GitHub side below is a browser fixture. No requests are sent to GitHub."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Live mode: Sync now creates and updates real GitHub issues and comments. Keep this tab open to sync."
+msgstr "Live mode: Sync now creates and updates real GitHub issues and comments. Keep this tab open to sync."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Open Atomic kanban"
+msgstr "Open Atomic kanban"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "New issue title or comment"
+msgstr "New issue title or comment"
+
+#~ msgid "Done"
+#~ msgstr "Done"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen Atomic issue"
+msgstr "Reopen Atomic issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close Atomic issue"
+msgstr "Close Atomic issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add Atomic comment"
+msgstr "Add Atomic comment"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic tracker"
+msgstr "Atomic tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Atomic issues"
+msgstr "Atomic issues"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Reopen sample GitHub issue"
+msgstr "Reopen sample GitHub issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Close sample GitHub issue"
+msgstr "Close sample GitHub issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Add sample GitHub comment"
+msgstr "Add sample GitHub comment"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create sample GitHub issue"
+msgstr "Create sample GitHub issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Create Atomic issue"
+msgstr "Create Atomic issue"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub tracker"
+msgstr "Sample GitHub tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Sample GitHub issues"
+msgstr "Sample GitHub issues"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect through LocalThought. The tenant secret is used in this tab to start the connection and is never saved."
+msgstr "Connect through LocalThought. The tenant secret is used in this tab to start the connection and is never saved."
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect GitHub tracker"
+msgstr "Connect GitHub tracker"
+
+#: src/routes/DevonianDemoRoute.tsx
+msgid "Connect another tracker"
+msgstr "Connect another tracker"

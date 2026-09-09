@@ -1,3 +1,4 @@
+import { LocalThoughtCatalog } from '../chunks/PluginRuns/LocalThoughtCatalog';
 import { NewAutomation } from '../chunks/PluginRuns/NewAutomation';
 import {
   IntegrationDiscovery,
@@ -47,9 +48,14 @@ export const IntegrationStoreRoute = createRoute({
   getParentRoute: () => appRoute,
   path: pathNames.integrations,
   component: IntegrationStore,
+  validateSearch: (search: Record<string, unknown>) => ({
+    workspace:
+      typeof search.workspace === 'string' ? search.workspace : undefined,
+  }),
 });
 
 function IntegrationStore(): React.JSX.Element {
+  const { workspace } = IntegrationStoreRoute.useSearch();
   const store = useStore();
   const { drive } = useSettings();
   const navigate = useNavigateWithTransition();
@@ -185,7 +191,7 @@ function IntegrationStore(): React.JSX.Element {
           </Header>
           {installed.length > 0 && (
             <section aria-label='Your integrations'>
-              <h2>Your integrations</h2>
+              <h2>Your connections</h2>
               <Grid>
                 {installed.map(subject => (
                   <ConnectedIntegration
@@ -222,17 +228,13 @@ function IntegrationStore(): React.JSX.Element {
           />
           {error && <Card role='alert'>{error}</Card>}
           {!listings && !error && <p>Loading integrations…</p>}
-          {listings && visible?.length === 0 && bundled.length === 0 && (
-            <p>
-              No matching integrations. Try an app name or a task such as
-              kanban.
-            </p>
-          )}
           <Grid>
+            <LocalThoughtCatalog drive={drive} search={search} />
             {bundled.map(entry => (
               <IntegrationDiscovery
                 key={entry.id}
                 entry={entry}
+                workspace={workspace}
                 drive={drive}
               />
             ))}
