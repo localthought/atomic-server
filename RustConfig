@@ -9,3 +9,5 @@ RUST_CARGO_BUILD_FLAGS="--release -p atomic-server --bin atomic-server"
 
 # This deployment must include a functioning server-side plugin runtime.
 export ATOMICSERVER_REQUIRE_PLUGIN_RUNTIME=true
+# The Apt buildpack extracts LLVM outside the system library search path.
+export LIBCLANG_PATH="$BUILD_DIR/.apt/usr/lib/llvm-18/lib"

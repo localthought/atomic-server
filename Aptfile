@@ -1,0 +1,2 @@
+# QuickJS's WASI bindings use bindgen during the server build.
+libclang-18-dev
