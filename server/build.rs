@@ -602,6 +602,7 @@ fn build_plugin_runtime() {
     println!("cargo:rerun-if-changed=../plugin-runtime/src");
     println!("cargo:rerun-if-changed=../plugin-runtime/wit");
     println!("cargo:rerun-if-env-changed=ATOMICSERVER_SKIP_PLUGIN_RUNTIME");
+    println!("cargo:rerun-if-env-changed=ATOMICSERVER_REQUIRE_PLUGIN_RUNTIME");
 
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR is set by cargo");
     let embedded = PathBuf::from(&out_dir).join("plugin_runtime.wasm");
@@ -647,14 +648,14 @@ fn build_plugin_runtime() {
             .env_remove("RUSTFLAGS")
             .env_remove("CARGO_BUILD_TARGET")
             .current_dir("..")
-            .status();
+            .output();
 
     let artifact = runtime_target
         .join(TARGET)
         .join("release/atomic_plugin_runtime.wasm");
 
     match built {
-        Ok(status) if status.success() && artifact.exists() => {
+        Ok(output) if output.status.success() && artifact.exists() => {
             std::fs::copy(&artifact, &embedded).expect("could not embed the plugin runtime");
             p!(
                 "embedded the plugin runtime ({} KB)",
@@ -663,7 +664,21 @@ fn build_plugin_runtime() {
                     .unwrap_or(0),
             );
         }
-        _ => {
+        result => {
+            let diagnostics = match result {
+                Ok(output) => format!(
+                    "{}\n{}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr),
+                ),
+                Err(error) => error.to_string(),
+            };
+            if std::env::var("ATOMICSERVER_REQUIRE_PLUGIN_RUNTIME").is_ok_and(|v| v == "true") {
+                panic!("Required plugin runtime failed to build:\n{diagnostics}");
+            }
+            for line in diagnostics.lines() {
+                p!("plugin runtime: {line}");
+            }
             p!(
                 "could not build {CRATE} for {TARGET}; plugins will not run server-side. \
                  Install the target with `rustup target add {TARGET}`.",
